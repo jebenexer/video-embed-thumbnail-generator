@@ -54,6 +54,11 @@ Bulgarian: Emil Georgiev, svinqvmraka@gmail.com
 if ( ! defined( 'WPINC' ) )
 	die( "Can't load this file directly" );
 
+function s3_to_http($uri) {
+  return preg_replace('#^s3://#', 'https://s3.amazonaws.com/', $uri);
+}
+
+
 function kgvid_default_options_fn() {
 
 	$upload_capable = kgvid_check_if_capable('upload_files');
@@ -1212,7 +1217,7 @@ function kgvid_get_video_dimensions($video = false) {
 	$options = kgvid_get_options();
 	$ffmpegPath = $options['app_path']."/".$options['video_app'];
 	$movie_info = array();
-
+  $video = s3_to_http($video);
 	$video = str_replace("https://", "http://",  $video);
 
 	if ( strpos($video, 'http://') === 0 ) { //if it's a URL
@@ -1227,7 +1232,7 @@ function kgvid_get_video_dimensions($video = false) {
 			}
 		}
 	}
-
+  $video = s3_to_http($video);
 	$command = escapeshellcmd($ffmpegPath . ' -i "' . $video . '"');
 	$command = $command.' 2>&1';
 	exec ( $command, $output );
@@ -1340,7 +1345,7 @@ function kgvid_generate_encode_string($input, $output, $movie_info, $format, $wi
 	$options = kgvid_get_options();
 	$libraries = $movie_info['configuration'];
 	$encode_string = strtoupper($options['video_app'])." not found";
-
+  $input = s3_to_http($input);
 	if ( $options['ffmpeg_exists'] == "on" ) {
 
 		$video_formats = kgvid_video_formats();
@@ -5800,7 +5805,7 @@ function kgvid_image_attachment_fields_to_edit($form_fields, $post) {
 				$moviefiletype = pathinfo($movieurl, PATHINFO_EXTENSION);
 				$h264compatible = array("mp4", "mov", "m4v");
 				if ( $moviefiletype == "mov" || $moviefiletype == "m4v" ) { $moviefiletype = "mp4"; }
-
+        $movieurl = s3_to_http($movieurl);
 				$video_formats = kgvid_video_formats();
 				$encodevideo_info = kgvid_encodevideo_info($movieurl, $post->ID);
 				if ( in_array($moviefiletype, $h264compatible) ) {
@@ -5814,7 +5819,7 @@ function kgvid_image_attachment_fields_to_edit($form_fields, $post) {
 
 				foreach ($video_formats as $format => $format_stats) {
 					if ( $format != "original" && $encodevideo_info[$format]["url"] == $movieurl ) { unset($sources['original']); }
-					if ( $encodevideo_info[$format]["exists"] ) { $sources[$format] = '<source src="'.$encodevideo_info[$format]["url"].'" type="'.$format_stats["mime"].'">'; }
+					if ( $encodevideo_info[$format]["exists"] ) { $sources[$format] = '<source src="'.s3_to_http($encodevideo_info[$format]["url"]).'" type="'.$format_stats["mime"].'">'; }
 				}
 
 				if ( $img_editor_works ) {
@@ -6875,7 +6880,7 @@ function kgvid_make_thumbs($postID, $movieurl, $numberofthumbs, $i, $iincreaser,
 			$moviefilepath = esc_url_raw(str_replace(" ", "%20", $movieurl));
 			$moviefilepath = str_replace("https://", "http://",  $moviefilepath);
 		}
-
+    $moviefilepath = s3_to_http($moviefilepath);
 		$kgvid_postmeta = kgvid_get_attachment_meta($postID);
 		$keys = array( 'width' => 'actualwidth', 'height' => 'actualheight', 'duration' => 'duration', 'rotate' => 'rotate' );
 
@@ -6895,7 +6900,8 @@ function kgvid_make_thumbs($postID, $movieurl, $numberofthumbs, $i, $iincreaser,
 		}
 	}
 	else {
-		$moviefilepath = esc_url_raw(str_replace(" ", "%20", $movieurl));
+    $moviefilepath = esc_url_raw(str_replace(" ", "%20", $movieurl));
+		$moviefilepath = s3_to_http($moviefilepath);
 		$moviefilepath = str_replace("https://", "http://",  $moviefilepath);
 		$movie_info = kgvid_get_video_dimensions($moviefilepath);
 	}
@@ -6991,7 +6997,7 @@ function kgvid_enqueue_videos($postID, $movieurl, $encode_checked, $parent_id, $
 	$options = kgvid_get_options();
 	$ffmpegPath = $options['app_path']."/".$options['video_app'];
 	$uploads = wp_upload_dir();
-
+  $movieurl = s3_to_http($movieurl);
 	$embed_display = "";
 	$start_encoding = false;
 	$encode_these = array();
@@ -7002,8 +7008,10 @@ function kgvid_enqueue_videos($postID, $movieurl, $encode_checked, $parent_id, $
 	$sanitized_url = kgvid_sanitize_url($movieurl);
 	$movieurl = $sanitized_url['movieurl'];
 	$post_type = get_post_type($postID);
+  $moviefilepath = s3_to_http($moviefilepath);
 	if ( $post_type == "attachment" ) { $filepath = get_attached_file($postID); }
 	else { $filepath = $movieurl; }
+
 	$mime_type_check = wp_check_filetype($filepath);
 	$movie_info = kgvid_get_video_dimensions($filepath);
 
@@ -7301,9 +7309,9 @@ function kgvid_encode_videos() {
 
 				$ffmpegPath = $options['app_path']."/".$options['video_app'];
 				$moviefilepath = '';
-				if ( get_post_type($video['attachmentID']) == "attachment" ) { $moviefilepath = get_attached_file($video['attachmentID']); }
+				if ( get_post_type($video['attachmentID']) == "attachment" ) { $moviefilepath = s3_to_http(get_attached_file($video['attachmentID'])); }
 				elseif ( empty($moviefilepath) || !file_exists($moviefilepath) ) {
-					$moviefilepath = str_replace(" ", "%20", esc_url_raw($video['movieurl']));
+					$moviefilepath = str_replace(" ", "%20", esc_url_raw(s3_to_http($video['movieurl'])));
 					$moviefilepath = str_replace("https://", "http://",  $moviefilepath);
 				}
 
